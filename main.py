@@ -1,4 +1,17 @@
 import argparse
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+from canny import Canny_detector
+
+
+def detect_edges(image):
+    """Apply Sobel filtering to detect edges"""
+    grad_x = cv2.Sobel(image, cv2.CV_64F, 1, 0, ksize=1)
+    grad_y = cv2.Sobel(image, cv2.CV_64F, 0, 1, ksize=1)
+    edges = np.hypot(grad_x, grad_y)
+    return (edges / edges.max() * 255).astype(np.uint8)
 
 
 def testTask1(folderName):
@@ -8,7 +21,45 @@ def testTask1(folderName):
     # Write code to process the image
     # Write your code to calculate the angle and obtain the result as a list predAngles
     # Calculate and provide the error in predicting the angle for each image
-    return(totalError)
+    for index, row in task1Data.iterrows():
+        image_path = row["FileName"]
+        
+        # Load an image in grayscale
+        image =  cv2.imread(f"Task1Dataset/{image_path}", cv2.IMREAD_GRAYSCALE)
+
+        # Check if the image is loaded correctly
+        if image is None:
+            print("Error: Image not found or unable to load.")
+        else:
+
+            # Initialize the custom Canny Edge Detector
+            edges_custom = Canny_detector(image, 50, 150)
+
+            edges_canny = cv2.Canny(image, 50, 150)  # Canny Edge Detection
+
+            # Display the original image and edge-detected image side by side
+            plt.figure(figsize=(10, 5))
+
+            # plt.subplot(1, 3, 1)
+            # plt.imshow(image, cmap="gray")
+            # plt.title("Original Image")
+            # plt.axis("off")
+
+            plt.subplot(1, 2, 1)
+            plt.imshow(edges_custom, cmap="gray")
+            plt.title("Detected Edges")
+            plt.axis("off")
+
+            plt.subplot(1, 2, 2)
+            plt.imshow(edges_canny, cmap="gray")
+            plt.title("cv2.Canny() Output")
+            plt.axis("off")
+
+            plt.show()
+    
+    
+    
+    return(0)
 
 def testTask2(iconDir, testDir):
     # assume that test folder name has a directory annotations with a list of csv files
@@ -48,3 +99,5 @@ if __name__ == "__main__":
         # The Icon dataset directory contains an icon image for each file
         # The Task3 dataset has two directories, an annotation directory that contains the annotation and a png directory with list of images 
         testTask3(args.IconDataset,args.Task3Dataset)
+
+
