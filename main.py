@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from canny import Canny_detector
-
+from hough_transform import detect_hough_lines
 
 def detect_edges(image):
     """Apply Sobel filtering to detect edges"""
@@ -21,45 +21,60 @@ def testTask1(folderName):
     # Write code to process the image
     # Write your code to calculate the angle and obtain the result as a list predAngles
     # Calculate and provide the error in predicting the angle for each image
+    
     for index, row in task1Data.iterrows():
         image_path = row["FileName"]
-        
+
         # Load an image in grayscale
-        image =  cv2.imread(f"Task1Dataset/{image_path}", cv2.IMREAD_GRAYSCALE)
+        image = cv2.imread(f"Task1Dataset/{image_path}", cv2.IMREAD_GRAYSCALE)
 
         # Check if the image is loaded correctly
         if image is None:
-            print("Error: Image not found or unable to load.")
-        else:
+            print(f"Error: Image {image_path} not found or unable to load.")
+            continue
 
-            # Initialize the custom Canny Edge Detector
-            edges_custom = Canny_detector(image, 50, 150)
+        edges_custom = Canny_detector(image, 50, 150) # Canny Edge Detection
 
-            edges_canny = cv2.Canny(image, 50, 150)  # Canny Edge Detection
+        # Detect hough lines
+        lines_custom = detect_hough_lines(edges_custom, threshold_ratio=0.7)
+        image_with_lines_custom = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
 
-            # Display the original image and edge-detected image side by side
-            plt.figure(figsize=(10, 5))
+        # Draw hough lines
+        if lines_custom is not None:
+            for line in lines_custom:
+                rho, theta = line[0]
+                a = np.cos(theta)
+                b = np.sin(theta)
+                x0 = int(a * rho)
+                y0 = int(b * rho)
+                x1 = int(x0 + 1000 * (-b))
+                y1 = int(y0 + 1000 * (a))
+                x2 = int(x0 - 1000 * (-b))
+                y2 = int(y0 - 1000 * (a))
+                cv2.line(image_with_lines_custom, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-            # plt.subplot(1, 3, 1)
-            # plt.imshow(image, cmap="gray")
-            # plt.title("Original Image")
-            # plt.axis("off")
+        # Display results
+        plt.figure(figsize=(10, 5))
 
-            plt.subplot(1, 2, 1)
-            plt.imshow(edges_custom, cmap="gray")
-            plt.title("Detected Edges")
-            plt.axis("off")
+        plt.subplot(1, 3, 1)
+        plt.imshow(image, cmap="gray")
+        plt.title("Original Image")
+        plt.axis("off")
 
-            plt.subplot(1, 2, 2)
-            plt.imshow(edges_canny, cmap="gray")
-            plt.title("cv2.Canny() Output")
-            plt.axis("off")
+        plt.subplot(1, 3, 2)
+        plt.imshow(edges_custom, cmap="gray")
+        plt.title("Detected Edges")
+        plt.axis("off")
 
-            plt.show()
-    
-    
-    
-    return(0)
+        plt.subplot(1, 3, 3)
+        plt.imshow(image_with_lines_custom)
+        plt.title("Hough Lines")
+        plt.axis("off")
+
+        plt.show()
+
+    return 0
+
 
 def testTask2(iconDir, testDir):
     # assume that test folder name has a directory annotations with a list of csv files
