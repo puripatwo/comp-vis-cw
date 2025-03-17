@@ -3,7 +3,8 @@ import cv2
 import matplotlib.pyplot as plt 
 
 
-def Canny_detector(img, weak_th=None, strong_th=None):
+def canny_detector(img, weak_th=None, strong_th=None):
+    """Perform Canny edge detection"""
     
     # Noise reduction step
     img = cv2.GaussianBlur(img, (5, 5), 1.4)
@@ -12,7 +13,7 @@ def Canny_detector(img, weak_th=None, strong_th=None):
     gx = cv2.Sobel(np.float32(img), cv2.CV_64F, 1, 0, 3)
     gy = cv2.Sobel(np.float32(img), cv2.CV_64F, 0, 1, 3)
     
-    # Conversion of Cartesian coordinates to polar  
+    # Converting Cartesian coordinates to polar  
     mag, ang = cv2.cartToPolar(gx, gy, angleInDegrees=True)
     
     # Setting thresholds for double thresholding
@@ -29,7 +30,8 @@ def Canny_detector(img, weak_th=None, strong_th=None):
     for i_x in range(width):
         for i_y in range(height):
             grad_ang = ang[i_y, i_x]
-            grad_ang = abs(grad_ang-180) if abs(grad_ang)>180 else abs(grad_ang)
+            grad_ang = abs(grad_ang-180) if abs(grad_ang) > 180 else abs(grad_ang)
+
             # Determine neighbors based on gradient direction
             if grad_ang <= 22.5:
                 neighb_1_x, neighb_1_y = i_x-1, i_y
@@ -63,10 +65,9 @@ def Canny_detector(img, weak_th=None, strong_th=None):
             if grad_mag < weak_th:
                 mag[i_y, i_x] = 0
             elif strong_th > grad_mag >= weak_th:
-                mag[i_y, i_x] = weak_th  # Optionally mark weak edges differently
+                mag[i_y, i_x] = weak_th
             else:
                 mag[i_y, i_x] = strong_th
     
     # Return the final edge-detected image
     return mag
-

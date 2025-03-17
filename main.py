@@ -3,8 +3,10 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-from canny import Canny_detector
+
+from canny import canny_detector
 from hough_transform import detect_hough_lines
+
 
 def detect_edges(image):
     """Apply Sobel filtering to detect edges"""
@@ -16,30 +18,31 @@ def detect_edges(image):
 
 def testTask1(folderName):
     # assume that this folder name has a file list.txt that contains the annotation
-    task1Data = pd.read_csv(folderName+"/list.txt")
     # Write code to read in each image
     # Write code to process the image
     # Write your code to calculate the angle and obtain the result as a list predAngles
     # Calculate and provide the error in predicting the angle for each image
+    task1Data = pd.read_csv(folderName+"/list.txt")
     
     for index, row in task1Data.iterrows():
         image_path = row["FileName"]
 
-        # Load an image in grayscale
+        # 1. Load an image in grayscale.
         image = cv2.imread(f"Task1Dataset/{image_path}", cv2.IMREAD_GRAYSCALE)
 
-        # Check if the image is loaded correctly
+        # 2. Check if the image is loaded correctly.
         if image is None:
             print(f"Error: Image {image_path} not found or unable to load.")
             continue
 
-        edges_custom = Canny_detector(image, 50, 150) # Canny Edge Detection
+        # 3. Perform Canny edge detection.
+        edges_custom = canny_detector(image, 50, 150)
 
-        # Detect hough lines
+        # 4. Detect hough lines.
         lines_custom = detect_hough_lines(edges_custom, threshold_ratio=0.7)
         image_with_lines_custom = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
 
-        # Draw hough lines
+        # Visualize hough lines
         if lines_custom is not None:
             for line in lines_custom:
                 rho, theta = line[0]
@@ -53,7 +56,7 @@ def testTask1(folderName):
                 y2 = int(y0 - 1000 * (a))
                 cv2.line(image_with_lines_custom, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-        # Display results
+        # 5. Display the results.
         plt.figure(figsize=(10, 5))
 
         plt.subplot(1, 3, 1)
@@ -72,6 +75,8 @@ def testTask1(folderName):
         plt.axis("off")
 
         plt.show()
+
+        
 
     return 0
 
