@@ -22,10 +22,12 @@ def testTask1(folderName):
     # Write code to process the image
     # Write your code to calculate the angle and obtain the result as a list predAngles
     # Calculate and provide the error in predicting the angle for each image
+    totalError = []
     task1Data = pd.read_csv(folderName+"/list.txt")
     
     for index, row in task1Data.iterrows():
         image_path = row["FileName"]
+        target_angle = row["AngleInDegrees"]
 
         # 1. Load an image in grayscale.
         image = cv2.imread(f"Task1Dataset/{image_path}", cv2.IMREAD_GRAYSCALE)
@@ -37,48 +39,98 @@ def testTask1(folderName):
 
         # 3. Perform Canny edge detection.
         edges_custom = canny_detector(image, 50, 150)
+        edges = cv2.Canny(image, 50, 150)
 
         # 4. Detect hough lines.
         lines_custom = detect_hough_lines(edges_custom, threshold_ratio=0.7)
         image_with_lines_custom = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
-
-        # Visualize hough lines
-        if lines_custom is not None:
-            for line in lines_custom:
-                rho, theta = line[0]
-                a = np.cos(theta)
-                b = np.sin(theta)
-                x0 = int(a * rho)
-                y0 = int(b * rho)
-                x1 = int(x0 + 1000 * (-b))
-                y1 = int(y0 + 1000 * (a))
-                x2 = int(x0 - 1000 * (-b))
-                y2 = int(y0 - 1000 * (a))
-                cv2.line(image_with_lines_custom, (x1, y1), (x2, y2), (0, 255, 0), 2)
-
-        # 5. Display the results.
-        plt.figure(figsize=(10, 5))
-
-        plt.subplot(1, 3, 1)
-        plt.imshow(image, cmap="gray")
-        plt.title("Original Image")
-        plt.axis("off")
-
-        plt.subplot(1, 3, 2)
-        plt.imshow(edges_custom, cmap="gray")
-        plt.title("Detected Edges")
-        plt.axis("off")
-
-        plt.subplot(1, 3, 3)
-        plt.imshow(image_with_lines_custom)
-        plt.title("Hough Lines")
-        plt.axis("off")
-
-        plt.show()
-
         
+        if lines_custom is not None and len(lines_custom) == 2:
+            # Extract rho and theta for both lines
+            rho1, theta1 = lines_custom[0, 0]
+            rho2, theta2 = lines_custom[1, 0]
 
-    return 0
+            # Compute line equations in the form Ax + By = C
+            a1, b1 = np.cos(theta1), np.sin(theta1)
+            a2, b2 = np.cos(theta2), np.sin(theta2)
+
+            A1, B1, C1 = a1, b1, rho1
+            A2, B2, C2 = a2, b2, rho2
+
+            # Solve for intersection (Ax + By = C system)
+            det = A1 * B2 - A2 * B1
+            if abs(det) > 1e-6:  # Ensure lines are not parallel
+                x_int = (C1 * B2 - C2 * B1) / det
+                y_int = (A1 * C2 - A2 * C1) / det
+                intersection = (int(x_int), int(y_int))
+
+                # Compute endpoints for both lines
+                x01, y01 = int(a1 * rho1), int(b1 * rho1)
+                x11, y11 = int(x01 + 1000 * (-b1)), int(y01 + 1000 * (a1))
+                x21, y21 = int(x01 - 1000 * (-b1)), int(y01 - 1000 * (a1))
+
+                x02, y02 = int(a2 * rho2), int(b2 * rho2)
+                x12, y12 = int(x02 + 1000 * (-b2)), int(y02 + 1000 * (a2))
+                x22, y22 = int(x02 - 1000 * (-b2)), int(y02 - 1000 * (a2))
+
+                def split_line(x1, y1, x2, y2, x_int, y_int, y_tolerance=2):
+                    """Splits a line at intersection favoring 'top' (lower y) and then 'right' (higher x) direction."""
+                    if abs(y1 - y2) <= y_tolerance:  # If y-values are very close, decide based on x
+                        before = (x1, y1) if x1 > x2 else (x2, y2)  # Favor right (higher x)
+                    else:
+                        before = (x1, y1) if y1 < y2 else (x2, y2)  # Favor higher (lower y)
+                    after = (x1, y1) if before == (x2, y2) else (x2, y2)
+                    return before, (int(x_int), int(y_int)), after
+
+                # Split the first and second line
+                before1, inter1, after1 = split_line(x11, y11, x21, y21, x_int, y_int)
+                before2, inter2, after2 = split_line(x12, y12, x22, y22, x_int, y_int)
+
+                # Draw split lines
+                cv2.line(image_with_lines_custom, before1, inter1, (255, 0, 0), 2)
+                cv2.line(image_with_lines_custom, inter1, after1, (0, 255, 0), 2)
+                cv2.line(image_with_lines_custom, before2, inter2, (255, 0, 0), 2)
+                cv2.line(image_with_lines_custom, inter2, after2, (0, 255, 0), 2)
+                cv2.circle(image_with_lines_custom, intersection, 5, (0, 0, 255), -1)
+
+                # 5. Calculate angle using "before intersection" segments
+                v1 = np.array([before1[0] - inter1[0], before1[1] - inter1[1]])
+                v2 = np.array([before2[0] - inter2[0], before2[1] - inter2[1]])
+
+                v1 = v1 / np.linalg.norm(v1)
+                v2 = v2 / np.linalg.norm(v2)
+
+                dot_product = np.dot(v1, v2)
+                angle_radians = np.arccos(np.clip(dot_product, -1.0, 1.0))
+                angle_degrees = np.degrees(angle_radians)
+
+                error = 0
+                error = float(abs(angle_degrees - target_angle))
+                totalError.append(error)
+                # print(index + 1, angle_degrees, target_angle)
+
+        # # Display the results
+        # plt.figure(figsize=(10, 5))
+
+        # plt.subplot(1, 3, 1)
+        # plt.imshow(image, cmap="gray")
+        # plt.title("Original Image")
+        # plt.axis("off")
+
+        # plt.subplot(1, 3, 2)
+        # plt.imshow(edges_custom, cmap="gray")
+        # plt.title("Detected Edges")
+        # plt.axis("off")
+
+        # plt.subplot(1, 3, 3)
+        # plt.imshow(image_with_lines_custom)
+        # plt.title("Hough Lines")
+        # plt.axis("off")
+
+        # plt.show()
+
+    print(totalError)
+    return (totalError)
 
 
 def testTask2(iconDir, testDir):
@@ -100,11 +152,10 @@ def testTask3(iconFolderName, testFolderName):
 
 
 if __name__ == "__main__":
-
     # parsing the command line path to directories and invoking the test scripts for each task
     parser = argparse.ArgumentParser("Data Parser")
-    parser.add_argument("--Task1Dataset", help="Provide a folder that contains the Task 1 Dataset.", type=str, required=False)
-    parser.add_argument("--IconDataset", help="Provide a folder that contains the Icon Dataset for Task2 and Task3.", type=str, required=False)
+    parser.add_argument("--Task1Dataset", default="Task1Dataset", help="Provide a folder that contains the Task 1 Dataset.", type=str, required=False)
+    parser.add_argument("--IconDataset", help="Provide a folder that contains the Icon Dataset for Task 2 and Task 3.", type=str, required=False)
     parser.add_argument("--Task2Dataset", help="Provide a folder that contains the Task 2 test Dataset.", type=str, required=False)
     parser.add_argument("--Task3Dataset", help="Provide a folder that contains the Task 3 test Dataset.", type=str, required=False)
     args = parser.parse_args()
@@ -119,5 +170,3 @@ if __name__ == "__main__":
         # The Icon dataset directory contains an icon image for each file
         # The Task3 dataset has two directories, an annotation directory that contains the annotation and a png directory with list of images 
         testTask3(args.IconDataset,args.Task3Dataset)
-
-
