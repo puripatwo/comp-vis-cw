@@ -1,24 +1,30 @@
 import cv2
 import os
 import matplotlib.pyplot as plt
+import numpy as np
 
-# Load an image, convert it to grayscale then set the background to black
-def preprocess_image(image_path):
+# Load an image, convert to grayscale if needed, set background to black
+def preprocess_image(image_path, grayscale=False):
     image = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
-    
+
     if image is None:
         print(f"Error: Unable to load image {image_path}")
         return None
 
+    # Create mask based on brightness of grayscale
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
     _, mask = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY)
     mask = cv2.bitwise_not(mask)
 
     # Apply the mask to the image
     processed_image = cv2.bitwise_and(image, image, mask=mask)
 
+    # Convert to grayscale if requested
+    if grayscale:
+        processed_image = cv2.cvtColor(processed_image, cv2.COLOR_BGR2GRAY)
+
     return processed_image
+
 
 ######################################
 ###### Visualise processed image below
