@@ -2,10 +2,10 @@ import os
 from preprocess import preprocess_image
 from pyramid import create_laplacian_pyramid
 
+
 def prepare_templates(template_dir, num_levels=4):
     """
-    Loads all training templates, preprocesses them (grayscale + background masked),
-    and builds Gaussian pyramids.
+    Loads all training templates, preprocesses them (grayscale + background masked), and builds Gaussian pyramids.
 
     Returns:
         dict: {class_label: [pyramid_level_0, ..., pyramid_level_n]}

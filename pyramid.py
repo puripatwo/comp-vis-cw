@@ -1,19 +1,21 @@
 import cv2
 import numpy as np
 
+
 # Create Gaussian pyramid with image and number of pyramid levels (num_levels)
 # returns list: pyramid of images
 def create_gaussian_pyramid(image, num_levels=4):
 
-    pyramid = [image]
+    gaussian_pyramid = [image]
     current_image = image.copy()
     
     for _ in range(1, num_levels):
         downsampled = cv2.pyrDown(current_image)
-        pyramid.append(downsampled)
+        gaussian_pyramid.append(downsampled)
         current_image = downsampled
     
-    return pyramid
+    return gaussian_pyramid
+
 
 # Create Laplacian pyramid with gaussian pyramid
 # returns list: Laplacian pyramid of images
@@ -43,10 +45,7 @@ def create_laplacian_pyramid(image, num_levels=4):
     return laplacian_pyramid
 
 
-################################################################################################
-# Stuff down here is just to visualise the pyramids, prob not needed for final code/submission??
-
-def visualize_pyramid(pyramid):
+def visualize_gaussian_pyramid(pyramid):
     normalized_pyramid = [
         cv2.normalize(level, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
         for level in pyramid
@@ -68,6 +67,7 @@ def visualize_pyramid(pyramid):
         current_x += level.shape[1]
     
     return canvas
+
 
 def visualize_laplacian_pyramid(laplacian_pyramid):
     normalized_pyramid = [
@@ -91,7 +91,7 @@ def visualize_laplacian_pyramid(laplacian_pyramid):
    
     return canvas
 
-# TESTING PYRAMID
+
 import os
 import matplotlib.pyplot as plt
 
@@ -112,7 +112,7 @@ if __name__ == "__main__":
         # Create Gaussian pyramid
         gaussian_pyramid = create_gaussian_pyramid(test_image)
         plt.figure(figsize=(15, 5))
-        plt.imshow(visualize_pyramid(gaussian_pyramid), cmap='gray')
+        plt.imshow(visualize_gaussian_pyramid(gaussian_pyramid), cmap='gray')
         plt.title(f'Gaussian Pyramid - {image_filename}')
         plt.axis('off')
         plt.tight_layout()

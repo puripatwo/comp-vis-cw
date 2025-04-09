@@ -3,6 +3,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
+
 # Load an image, convert to grayscale if needed, set background to black
 def preprocess_image(image_path, grayscale=False):
     image = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
@@ -26,9 +27,6 @@ def preprocess_image(image_path, grayscale=False):
     return processed_image
 
 
-######################################
-###### Visualise processed image below
-
 def visualize_image(processed):
 
     plt.figure(figsize=(6, 6))
@@ -40,6 +38,7 @@ def visualize_image(processed):
     plt.title("Processed image (Background Black)")
     plt.axis("off")
     plt.show()
+
 
 if __name__ == "__main__":
     test_image_path = "Task2Dataset/images/test_image_1.png"

@@ -3,11 +3,16 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+import os
 
 from canny import canny_detector
 from hough_transform import detect_hough_lines
+
 from preprocess import preprocess_image
 from pyramid import create_gaussian_pyramid, create_laplacian_pyramid
+from prepare_templates import prepare_templates
+from matching import match_all_templates
+
 
 def detect_edges(image):
     """Apply Sobel filtering to detect edges"""
@@ -140,7 +145,52 @@ def testTask2(iconDir, testDir):
     # For each predicted class, check accuracy with the annotations
     # Check and calculate the Intersection Over Union (IoU) score
     # based on the IoU determine accuracy, TruePositives, FalsePositives, FalseNegatives
-    return (Acc,TPR,FPR,FNR)
+    template_dir = iconDir
+    test_dir = os.path.join(testDir, "images")
+
+    output_dir = os.path.join(testDir, "results")
+    os.makedirs(output_dir, exist_ok=True)
+
+    # 1. Load and preprocess the templates.
+    print("Loading and preprocessing templates...")
+    templates_by_class = prepare_templates(template_dir, num_levels=5)
+
+    test_files = sorted([f for f in os.listdir(test_dir) if f.endswith(".png")])
+    for filename in test_files:
+        print(f"\nProcessing {filename}...")
+
+        # 2. Load and preprocess the test images.
+        test_image_path = os.path.join(test_dir, filename)
+        test_image = preprocess_image(test_image_path, grayscale=True)
+        original_image = cv2.imread(test_image_path)
+
+        # 3. Create the gaussian pyramid for the test images.
+        test_pyramid = create_gaussian_pyramid(test_image, num_levels=4)
+        detections = match_all_templates(test_pyramid, templates_by_class, threshold=0.8, iou_threshold=0.85)
+
+        # 4. Print out the detected objects.
+        print(f"{len(detections)} objects detected.")
+        for det in detections:
+            cls = det['class']
+            bbox = det['bbox']
+            score = det['score']
+            print(f"{cls} at {bbox} (score: {score:.2f})")
+
+            # 5. Visualize the detected objects.
+            x1, y1, x2, y2 = bbox
+            cv2.rectangle(original_image, (x1, y1), (x2, y2), color=(0, 255, 0), thickness=2)
+            label = f"{cls}: {score:.2f}"
+            cv2.putText(original_image, label, (x1, y1 - 10), 
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX, 
+                        fontScale=0.5, color=(0, 255, 0), thickness=1)
+            
+        output_path = os.path.join(output_dir, f"result_{filename}")
+        cv2.imwrite(output_path, original_image)
+
+    print("\nMatching complete. Results saved in:", output_dir)
+
+    # return (Acc,TPR,FPR,FNR)
+    return 0
 
 
 def testTask3(iconFolderName, testFolderName):
@@ -155,7 +205,7 @@ def testTask3(iconFolderName, testFolderName):
 if __name__ == "__main__":
     # parsing the command line path to directories and invoking the test scripts for each task
     parser = argparse.ArgumentParser("Data Parser")
-    parser.add_argument("--Task1Dataset", default="Task1Dataset", help="Provide a folder that contains the Task 1 Dataset.", type=str, required=False)
+    parser.add_argument("--Task1Dataset", help="Provide a folder that contains the Task 1 Dataset.", type=str, required=False)
     parser.add_argument("--IconDataset", help="Provide a folder that contains the Icon Dataset for Task 2 and Task 3.", type=str, required=False)
     parser.add_argument("--Task2Dataset", help="Provide a folder that contains the Task 2 test Dataset.", type=str, required=False)
     parser.add_argument("--Task3Dataset", help="Provide a folder that contains the Task 3 test Dataset.", type=str, required=False)
