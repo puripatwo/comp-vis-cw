@@ -1,6 +1,7 @@
 import os
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
 from preprocess import preprocess_image
 from pyramid import create_gaussian_pyramid, create_laplacian_pyramid
 from prepare_templates import prepare_templates
@@ -14,12 +15,13 @@ def normalized_cross_correlation(patch, template):
     return 0 if denominator == 0 else numerator / denominator
 
 
-def match_template_at_scale(image, template, class_label, threshold=0.85):
+def match_template_at_scale(image, template, class_label, threshold, stride):
     h, w = template.shape
     img_h, img_w = image.shape
+
     detections = []
-    for y in range(0, img_h - h + 1, 4):
-        for x in range(0, img_w - w + 1, 4):
+    for y in range(0, img_h - h + 1, stride):
+        for x in range(0, img_w - w + 1, stride):
             patch = image[y:y+h, x:x+w]
             score = normalized_cross_correlation(patch, template)
             if score > threshold:
@@ -36,7 +38,7 @@ def compute_iou(boxA, boxB):
     return interArea / float(areaA + areaB - interArea + 1e-5)
 
 
-def non_max_suppression(detections, iou_threshold=0.85):
+def non_max_suppression(detections, iou_threshold):
     detections = sorted(detections, key=lambda x: x['score'], reverse=True)
     keep = []
     while detections:
@@ -46,48 +48,69 @@ def non_max_suppression(detections, iou_threshold=0.85):
     return keep
 
 
-def match_all_templates(test_pyramid, templates_by_class, threshold=0.85, iou_threshold=0.85):
+def match_all_templates(test_image, templates_by_class, threshold, iou_threshold, stride):
     all_detections = []
 
-    for level_index, test_scaled in enumerate(test_pyramid):
-        for class_label, template_pyramid in templates_by_class.items():
-            for template in template_pyramid:
-                detections = match_template_at_scale(test_scaled, template, class_label, threshold)
+    i = 0
+    for class_label, template_pyramid in templates_by_class.items():
+        i += 1
+        # print(f"Class: {class_label} ({i})")
+        for level_index, template_scaled in enumerate(template_pyramid[1:], start=1):
+            # print(f"Level: {level_index}, {template_scaled.shape}")
 
-                # Rescale bounding boxes to original image coordinates
-                scale = 2 ** level_index
-                for det in detections:
-                    x1, y1, x2, y2 = det['bbox']
-                    det['bbox'] = [x1 * scale, y1 * scale, x2 * scale, y2 * scale]
-                    all_detections.append(det)
+            detections = match_template_at_scale(test_image, template_scaled, class_label, threshold, stride)
+
+            scale = 1 / (2 ** level_index)
+            for det in detections:
+                x1, y1, x2, y2 = det['bbox']
+
+                w = x2 - x1
+                h = y2 - y1
+                if w < 8 or h < 8:
+                    continue
+
+                det['bbox'] = [int(x1), int(y1), int(x2), int(y2)]
+                det['scale'] = scale
+                all_detections.append(det)
 
     return non_max_suppression(all_detections, iou_threshold)
 
 
-if __name__ == "__main__":
-    template_dir = "IconDataset/png"
-    test_dir = "Task2Dataset/images"
-    output_dir = "Task2Dataset/results"
+def evaluate_detections_with_class(gt_objects, det_objects, iou_threshold):
+    """
+    gt_objects: List of [x1, y1, x2, y2, class_label]
+    det_objects: List of {'bbox': [x1, y1, x2, y2], 'class': class_label}
+    """
+    matched = set()
+    ious = []
 
-    os.makedirs(output_dir, exist_ok=True)
+    for det_idx, det in enumerate(det_objects):
+        # print("det", det['class'])
+        for gt_idx, gt in enumerate(gt_objects):
+            # print("gt", gt[4])
+            if gt_idx in matched:
+                continue
 
-    print("Loading and preprocessing templates...")
-    templates_by_class = prepare_templates(template_dir, num_levels=5)
+            gt_box, gt_class = gt[:4], gt[4]
+            det_box, det_class = det['bbox'], det['class']
+            
+            iou = compute_iou(det_box, gt_box)
 
-    test_files = sorted([f for f in os.listdir(test_dir) if f.endswith(".png")])
+            if iou >= iou_threshold and det_class == gt_class:
+                matched.add(gt_idx)
+                ious.append(iou)
+                break
 
-    for filename in test_files:
-        print(f"\nProcessing {filename}...")
+    TP = len(matched)
+    FP = len(det_objects) - TP
+    FN = len(gt_objects) - TP
+    accuracy = TP / (TP + FP + FN + 1e-6)
+    avg_iou = np.mean(ious) if ious else 0.0
 
-        test_image_path = os.path.join(test_dir, filename)
-        test_image = preprocess_image(test_image_path, grayscale=True)
-        original_image = cv2.imread(test_image_path)
-
-        test_pyramid = create_gaussian_pyramid(test_image, num_levels=4)
-        detections = match_all_templates(test_pyramid, templates_by_class, threshold=0.8, iou_threshold=0.85)
-
-        print(f" → {len(detections)} objects detected.")
-        for det in detections:
-            print(f"   - {det['class']} at {det['bbox']} (score: {det['score']:.2f})")
-
-    print("\nMatching complete. Results saved in:", output_dir)
+    return {
+        'True Positives': TP,
+        'False Positives': FP,
+        'False Negatives': FN,
+        'Accuracy': accuracy,
+        'Average IoU': avg_iou
+    }

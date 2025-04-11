@@ -41,7 +41,7 @@ def visualize_image(processed):
 
 
 if __name__ == "__main__":
-    test_image_path = "Task2Dataset/images/test_image_1.png"
+    test_image_path = "Task2Dataset/images/test_image_2.png"
 
     if os.path.exists(test_image_path):
         processed = preprocess_image(test_image_path)

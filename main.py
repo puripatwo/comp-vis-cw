@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
+import time
 
 from canny import canny_detector
 from hough_transform import detect_hough_lines
@@ -11,7 +12,7 @@ from hough_transform import detect_hough_lines
 from preprocess import preprocess_image
 from pyramid import create_gaussian_pyramid, create_laplacian_pyramid
 from prepare_templates import prepare_templates
-from matching import match_all_templates
+from matching import match_all_templates, evaluate_detections_with_class
 
 
 def detect_edges(image):
@@ -151,22 +152,41 @@ def testTask2(iconDir, testDir):
     output_dir = os.path.join(testDir, "results")
     os.makedirs(output_dir, exist_ok=True)
 
+    target_dir = os.path.join(testDir, "annotations")
+
     # 1. Load and preprocess the templates.
     print("Loading and preprocessing templates...")
-    templates_by_class = prepare_templates(template_dir, num_levels=5)
+    templates_by_class = prepare_templates(template_dir, num_levels=3)
 
     test_files = sorted([f for f in os.listdir(test_dir) if f.endswith(".png")])
+    all_tp, all_fp, all_fn, all_ious = 0, 0, 0, []
+    total_runtime = 0
+    n_images = len(test_files)
+
     for filename in test_files:
-        print(f"\nProcessing {filename}...")
+        start_time = time.time()
+
+        name = filename.split(".")[0]
+        print(f"\nProcessing {name}...")
+
+        target_path = os.path.join(target_dir, f"{name}.csv")
+        target_df = pd.read_csv(target_path)
+        testing = {}
+        gt_objects = []
+        for index, row in target_df.iterrows():
+            classname = row["classname"]
+            classname = f"0{classname}"
+            testing[classname] = templates_by_class[classname]
+            temp = [row["top"], row["left"], row["bottom"], row["right"], classname]
+            gt_objects.append(temp)
 
         # 2. Load and preprocess the test images.
         test_image_path = os.path.join(test_dir, filename)
         test_image = preprocess_image(test_image_path, grayscale=True)
         original_image = cv2.imread(test_image_path)
 
-        # 3. Create the gaussian pyramid for the test images.
-        test_pyramid = create_gaussian_pyramid(test_image, num_levels=4)
-        detections = match_all_templates(test_pyramid, templates_by_class, threshold=0.8, iou_threshold=0.85)
+        # 3. Perform template matching.
+        detections = match_all_templates(test_image, templates_by_class, threshold=0.75, iou_threshold=0.60, stride=4)
 
         # 4. Print out the detected objects.
         print(f"{len(detections)} objects detected.")
@@ -174,7 +194,8 @@ def testTask2(iconDir, testDir):
             cls = det['class']
             bbox = det['bbox']
             score = det['score']
-            print(f"{cls} at {bbox} (score: {score:.2f})")
+            scale = det['scale']
+            print(f"{cls} at {bbox} (scale: {scale}) (score: {score:.2f})")
 
             # 5. Visualize the detected objects.
             x1, y1, x2, y2 = bbox
@@ -184,13 +205,40 @@ def testTask2(iconDir, testDir):
                         fontFace=cv2.FONT_HERSHEY_SIMPLEX, 
                         fontScale=0.5, color=(0, 255, 0), thickness=1)
             
-        output_path = os.path.join(output_dir, f"result_{filename}")
+        # 6. Evaluate the results.
+        metrics = evaluate_detections_with_class(gt_objects, detections, iou_threshold=0.85)
+
+        all_tp += metrics['True Positives']
+        all_fp += metrics['False Positives']
+        all_fn += metrics['False Negatives']
+        all_ious.append(metrics['Average IoU'])
+
+        for key, value in metrics.items():
+            print(f"{key}: {value}")
+        
+        total_runtime += time.time() - start_time
+        print(f"Runtime: {total_runtime}")
+            
+        output_path = os.path.join(output_dir, f"result_demo_{filename}")
         cv2.imwrite(output_path, original_image)
 
     print("\nMatching complete. Results saved in:", output_dir)
 
-    # return (Acc,TPR,FPR,FNR)
-    return 0
+    # 7. Final summary.
+    total = all_tp + all_fp + all_fn
+    accuracy = all_tp / (total + 1e-6)
+    avg_iou = np.mean(all_ious)
+    avg_runtime = total_runtime / n_images
+
+    print(f"\nEvaluation Results:")
+    print(f"True Positives:   {all_tp}")
+    print(f"False Positives:  {all_fp}")
+    print(f"False Negatives:  {all_fn}")
+    print(f"Accuracy:         {accuracy:.4f}")
+    print(f"Average IoU:      {avg_iou:.4f}")
+    print(f"Average Runtime:  {avg_runtime:.4f} seconds/image")
+
+    return (accuracy, all_tp, all_fp, all_fn)
 
 
 def testTask3(iconFolderName, testFolderName):

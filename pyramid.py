@@ -6,13 +6,13 @@ import numpy as np
 # returns list: pyramid of images
 def create_gaussian_pyramid(image, num_levels=4):
 
+    # Create Gaussian pyramid
     gaussian_pyramid = [image]
     current_image = image.copy()
     
-    for _ in range(1, num_levels):
-        downsampled = cv2.pyrDown(current_image)
-        gaussian_pyramid.append(downsampled)
-        current_image = downsampled
+    for i in range(1, num_levels + 1):
+        current_image = cv2.pyrDown(current_image)
+        gaussian_pyramid.append(current_image)
     
     return gaussian_pyramid
 
@@ -22,13 +22,7 @@ def create_gaussian_pyramid(image, num_levels=4):
 def create_laplacian_pyramid(image, num_levels=4):
 
     # Create Gaussian pyramid
-    gaussian_pyramid = [image]
-    current_image = image.copy()
-   
-    for _ in range(1, num_levels):
-        downsampled = cv2.pyrDown(current_image)
-        gaussian_pyramid.append(downsampled)
-        current_image = downsampled
+    gaussian_pyramid = create_gaussian_pyramid(image, num_levels)
    
     # Create Laplacian pyramid
     laplacian_pyramid = []
@@ -97,7 +91,7 @@ import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
 
-    dataset_dir = "Task2Dataset/images"
+    dataset_dir = "IconDataset/png"
     image_files = [f for f in os.listdir(dataset_dir)]
     
     for image_filename in image_files:
