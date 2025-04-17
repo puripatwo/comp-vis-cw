@@ -219,7 +219,7 @@ def testTask2(iconDir, testDir):
         total_runtime += time.time() - start_time
         print(f"Runtime: {total_runtime}")
             
-        output_path = os.path.join(output_dir, f"result_demo_{filename}")
+        output_path = os.path.join(output_dir, f"result_{filename}")
         cv2.imwrite(output_path, original_image)
 
     print("\nMatching complete. Results saved in:", output_dir)
