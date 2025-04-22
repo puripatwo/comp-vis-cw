@@ -14,6 +14,8 @@ from pyramid import create_gaussian_pyramid, create_laplacian_pyramid
 from prepare_templates import prepare_templates
 from matching import match_all_templates, evaluate_detections_with_class
 
+from sift_matching import batch_evaluate_all
+
 
 def detect_edges(image):
     """Apply Sobel filtering to detect edges"""
@@ -247,7 +249,13 @@ def testTask3(iconFolderName, testFolderName):
     # For each predicted class, check accuracy with the annotations
     # Check and calculate the Intersection Over Union (IoU) score
     # based on the IoU determine accuracy, TruePositives, FalsePositives, FalseNegatives
-    return (Acc,TPR,FPR,FNR)
+    icons_dir = iconFolderName
+    images_dir = os.path.join(testFolderName, "images")
+    annos_dir = os.path.join(testFolderName, "annotations")
+
+    avg_acc, avg_tpr, avg_fpr, avg_fnr = batch_evaluate_all(icons_dir, images_dir, annos_dir)
+    
+    return (avg_acc, avg_tpr, avg_fpr, avg_fnr)
 
 
 if __name__ == "__main__":

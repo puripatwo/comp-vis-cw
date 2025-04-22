@@ -6,8 +6,8 @@ import os
 import numpy as np
 import random
 
-# === Utility Functions ===
 
+### Utility Functions ###
 def normalize_points(pts):
     mean = np.mean(pts, axis=0)
     std = np.std(pts - mean)
@@ -18,6 +18,7 @@ def normalize_points(pts):
     pts_h = np.hstack([pts, np.ones((pts.shape[0], 1))])
     pts_norm = (T @ pts_h.T).T
     return pts_norm[:, :2], T
+
 
 def compute_homography(src_pts, dst_pts):
     src_norm, T1 = normalize_points(src_pts)
@@ -35,6 +36,7 @@ def compute_homography(src_pts, dst_pts):
 
     H = np.linalg.inv(T2) @ H_norm @ T1
     return H / H[2, 2]
+
 
 def symmetric_transfer_error(H, src_pts, dst_pts, eps=1e-8):
     N = src_pts.shape[0]
@@ -62,8 +64,8 @@ def symmetric_transfer_error(H, src_pts, dst_pts, eps=1e-8):
     err2 = np.linalg.norm(proj_src[:, :2] - src_pts, axis=1)
     return err1**2 + err2**2
 
-# === Model Wrapper ===
 
+### Model Wrapper ###
 class HomographyModel:
     def fit(self, data):
         src_pts = data[:, 0:2]
@@ -75,12 +77,13 @@ class HomographyModel:
         dst_pts = data[:, 2:4]
         return symmetric_transfer_error(H, src_pts, dst_pts)
 
-# === Generic RANSAC ===
 
+### Generic RANSAC ###
 def random_partition(n, data_size):
     all_idxs = np.arange(data_size)
     np.random.shuffle(all_idxs)
     return all_idxs[:n], all_idxs[n:]
+
 
 def ransac(data, model, n, k, t, d, return_all=False):
     iterations = 0
@@ -128,6 +131,7 @@ def ransac(data, model, n, k, t, d, return_all=False):
     else:
         return bestfit
     
+
 def extract_sift_features(image, grayscale=True):
     """Extract SIFT keypoints and descriptors."""
     if grayscale:
@@ -157,6 +161,7 @@ def match_features(desc1, desc2, ratio_thres=0.75):
         if idx_back[0] == q and d_back[idx_back[0]] < ratio_thres * d_back[idx_back[1]]:
             matches.append(cv2.DMatch(_queryIdx=q, _trainIdx=t, _distance=d_back[idx_back[0]]))
     return matches
+
 
 def detect_at_scale(icon_label, icon_shape, kp1, desc1, kp2, desc2,
                     scale_factor, reproj_thresh, min_inliers, ratio):
@@ -273,6 +278,6 @@ def batch_multiscale_detect(icons_dir, test_path,
     plt.axis('off')
     plt.show()
 
+
 if __name__=='__main__':
     batch_multiscale_detect('IconDataset/png','Task3Dataset/images/test_image_6.png')
-
