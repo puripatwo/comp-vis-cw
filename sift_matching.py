@@ -429,6 +429,7 @@ def batch_evaluate_all(icons_dir, images_dir, annos_dir,
         print(f"\n--- Evaluating {img_name} ---")
         detections = batch_multiscale_detect(icons_dir, image_path, visualize=False)
         gt = load_annotations_csv(anno_path)
+        visualize_detections_vs_gt(image_path, detections, gt, iou_thresh=0.85)
         acc, tpr, fpr, TP, FP, FN = evaluate_predictions(detections, gt, iou_thresh=iou_eval_thresh)
 
         total_TP += TP
@@ -443,13 +444,9 @@ def batch_evaluate_all(icons_dir, images_dir, annos_dir,
     total = total_TP + total_FP + total_FN
     avg_acc = total_TP / total if total else 0
 
-    # avg_tpr = total_TP / (total_TP + total_FN) if total_TP + total_FN else 0
-    # avg_fpr = total_FP / (total_TP + total_FP) if total_TP + total_FP else 0
-    # avg_fnr = total_FN / (total_TP + total_FN) if total_TP + total_FN else 0
-
-    avg_tpr = total_TP / num_images if num_images else 0
-    avg_fpr = total_FP / num_images if num_images else 0
-    avg_fnr = total_FN / num_images if num_images else 0
+    avg_tpr = total_TP / (total_TP + total_FN) if total_TP + total_FN else 0
+    avg_fpr = total_FP / (total_TP + total_FP) if total_TP + total_FP else 0
+    avg_fnr = total_FN / (total_TP + total_FN) if total_TP + total_FN else 0
 
     print(f"\nOverall Evaluation Across {num_images} Images")
     print(f"Total TP: {total_TP}, FP: {total_FP}, FN: {total_FN}")

@@ -10,7 +10,6 @@ from canny import canny_detector
 from hough_transform import detect_hough_lines
 
 from preprocess import preprocess_image
-from pyramid import create_gaussian_pyramid, create_laplacian_pyramid
 from prepare_templates import prepare_templates
 from matching import match_all_templates, evaluate_detections_with_class
 
@@ -208,7 +207,7 @@ def testTask2(iconDir, testDir):
                         fontScale=0.5, color=(0, 255, 0), thickness=1)
             
         # 6. Evaluate the results.
-        metrics = evaluate_detections_with_class(gt_objects, detections, iou_threshold=0.85)
+        metrics = evaluate_detections_with_class(gt_objects, detections, iou_threshold=0.75)
 
         all_tp += metrics['True Positives']
         all_fp += metrics['False Positives']
@@ -232,15 +231,19 @@ def testTask2(iconDir, testDir):
     avg_iou = np.mean(all_ious)
     avg_runtime = total_runtime / n_images
 
+    avg_tpr = all_tp / (all_tp + all_fn) if all_tp + all_fn else 0
+    avg_fpr = all_fp / (all_tp + all_fp) if all_tp + all_fp else 0
+    avg_fnr = all_fn / (all_tp + all_fn) if all_tp + all_fn else 0
+
     print(f"\nEvaluation Results:")
-    print(f"True Positives:   {all_tp}")
-    print(f"False Positives:  {all_fp}")
-    print(f"False Negatives:  {all_fn}")
+    print(f"True Positive Rate:   {avg_tpr}")
+    print(f"False Positive Rate:  {avg_fpr}")
+    print(f"False Negative Rate:  {avg_fnr}")
     print(f"Accuracy:         {accuracy:.4f}")
     print(f"Average IoU:      {avg_iou:.4f}")
     print(f"Average Runtime:  {avg_runtime:.4f} seconds/image")
 
-    return (accuracy, all_tp, all_fp, all_fn)
+    return (accuracy, avg_tpr, avg_fpr, avg_fnr)
 
 
 def testTask3(iconFolderName, testFolderName):
