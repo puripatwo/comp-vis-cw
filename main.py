@@ -47,7 +47,6 @@ def testTask1(folderName):
 
         # 3. Perform Canny edge detection.
         edges_custom = canny_detector(image, 50, 150)
-        edges = cv2.Canny(image, 50, 150)
 
         # 4. Detect hough lines.
         lines_custom = detect_hough_lines(edges_custom, threshold_ratio=0.7)
