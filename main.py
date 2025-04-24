@@ -157,7 +157,8 @@ def testTask2(iconDir, testDir):
 
     # 1. Load and preprocess the templates.
     print("Loading and preprocessing templates...")
-    templates_by_class = prepare_templates(template_dir, num_levels=3)
+    scales = []
+    templates_by_class = prepare_templates(template_dir, num_levels=3, preprocess=False, scales=scales, laplacian=True)
 
     test_files = sorted([f for f in os.listdir(test_dir) if f.endswith(".png")])
     all_tp, all_fp, all_fn, all_ious = 0, 0, 0, []
@@ -172,22 +173,22 @@ def testTask2(iconDir, testDir):
 
         target_path = os.path.join(target_dir, f"{name}.csv")
         target_df = pd.read_csv(target_path)
-        testing = {}
+
         gt_objects = []
-        for index, row in target_df.iterrows():
-            classname = row["classname"]
-            classname = f"0{classname}"
-            testing[classname] = templates_by_class[classname]
-            temp = [row["top"], row["left"], row["bottom"], row["right"], classname]
-            gt_objects.append(temp)
+        for index, row in target_df.iterrows(): 
+            gt_objects.append({
+                "bbox": [row["left"], row["top"], row["right"], row["bottom"]],
+                "class": f"0{row["classname"]}"
+                })
 
         # 2. Load and preprocess the test images.
         test_image_path = os.path.join(test_dir, filename)
-        test_image = preprocess_image(test_image_path, grayscale=True)
+        # test_image = preprocess_image(test_image_path, grayscale=True)
+        test_image = cv2.imread(test_image_path)
         original_image = cv2.imread(test_image_path)
 
         # 3. Perform template matching.
-        detections = match_all_templates(test_image, templates_by_class, threshold=0.75, iou_threshold=0.60, stride=4)
+        detections = match_all_templates(test_image, templates_by_class, score_threshold=0.75, nms_threshold=0.60)
 
         # 4. Print out the detected objects.
         print(f"{len(detections)} objects detected.")
@@ -195,19 +196,17 @@ def testTask2(iconDir, testDir):
             cls = det['class']
             bbox = det['bbox']
             score = det['score']
-            scale = det['scale']
-            print(f"{cls} at {bbox} (scale: {scale}) (score: {score:.2f})")
+            print(f"{cls} at {bbox} (score: {score:.2f})")
 
             # 5. Visualize the detected objects.
-            x1, y1, x2, y2 = bbox
+            y1, x1, y2, x2 = bbox
             cv2.rectangle(original_image, (x1, y1), (x2, y2), color=(0, 255, 0), thickness=2)
-            label = f"{cls}: {score:.2f}"
-            cv2.putText(original_image, label, (x1, y1 - 10), 
-                        fontFace=cv2.FONT_HERSHEY_SIMPLEX, 
+            cv2.putText(original_image, f"{cls}: {score:.2f}", (x1, y1 - 10),
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
                         fontScale=0.5, color=(0, 255, 0), thickness=1)
             
         # 6. Evaluate the results.
-        metrics = evaluate_detections_with_class(gt_objects, detections, iou_threshold=0.75)
+        metrics = evaluate_detections_with_class(gt_objects, detections, iou_threshold=0.85)
 
         all_tp += metrics['True Positives']
         all_fp += metrics['False Positives']
@@ -220,30 +219,29 @@ def testTask2(iconDir, testDir):
         total_runtime += time.time() - start_time
         print(f"Runtime: {total_runtime}")
             
-        output_path = os.path.join(output_dir, f"result_{filename}")
+        output_path = os.path.join(output_dir, f"laplacian_{filename}")
         cv2.imwrite(output_path, original_image)
 
     print("\nMatching complete. Results saved in:", output_dir)
 
     # 7. Final summary.
-    total = all_tp + all_fp + all_fn
-    accuracy = all_tp / (total + 1e-6)
+    tpr = all_tp / (all_tp + all_fn) if all_tp + all_fn else 0
+    fpr = all_fp / (all_tp + all_fn) if all_tp + all_fn else 0
+    fnr = all_fn / (all_tp + all_fn) if all_tp + all_fn else 0
+
+    accuracy = all_tp / (all_tp + all_fn) if all_tp + all_fn else 0
     avg_iou = np.mean(all_ious)
     avg_runtime = total_runtime / n_images
 
-    avg_tpr = all_tp / (all_tp + all_fn) if all_tp + all_fn else 0
-    avg_fpr = all_fp / (all_tp + all_fp) if all_tp + all_fp else 0
-    avg_fnr = all_fn / (all_tp + all_fn) if all_tp + all_fn else 0
-
     print(f"\nEvaluation Results:")
-    print(f"True Positive Rate:   {avg_tpr}")
-    print(f"False Positive Rate:  {avg_fpr}")
-    print(f"False Negative Rate:  {avg_fnr}")
+    print(f"True Positive Rate:   {tpr}")
+    print(f"False Positive Rate:  {fpr}")
+    print(f"False Negative Rate:  {fnr}")
     print(f"Accuracy:         {accuracy:.4f}")
     print(f"Average IoU:      {avg_iou:.4f}")
     print(f"Average Runtime:  {avg_runtime:.4f} seconds/image")
 
-    return (accuracy, avg_tpr, avg_fpr, avg_fnr)
+    return (accuracy, tpr, fpr, fnr)
 
 
 def testTask3(iconFolderName, testFolderName):

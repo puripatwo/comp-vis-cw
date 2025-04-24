@@ -17,6 +17,22 @@ def create_gaussian_pyramid(image, num_levels=4):
     return gaussian_pyramid
 
 
+def create_custom_gaussian_pyramid(image, scales):
+
+    # Create Gaussian pyramid
+    gaussian_pyramid = [image]
+    current_image = image.copy()
+    
+    for scale in scales:
+        current_image = cv2.resize(image, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+
+        sigma = max(1, int(25 * scale))
+        blurred_image = cv2.GaussianBlur(current_image, (5, 5), sigma)
+        gaussian_pyramid.append(blurred_image)
+    
+    return gaussian_pyramid
+
+
 # Create Laplacian pyramid with gaussian pyramid
 # returns list: Laplacian pyramid of images
 def create_laplacian_pyramid(image, num_levels=4):
