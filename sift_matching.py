@@ -207,7 +207,7 @@ def extract_sift_features(image, grayscale=True):
     """Extract SIFT keypoints and descriptors."""
     if grayscale:
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    sift = cv2.SIFT_create(nOctaveLayers=6)
+    sift = cv2.SIFT_create(contrastThreshold=0.02, edgeThreshold=10, nOctaveLayers=6)
     return sift.detectAndCompute(image, None)
 
 
