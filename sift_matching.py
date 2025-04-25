@@ -6,7 +6,7 @@ import os
 import numpy as np
 import random
 import csv
-
+import time
 
 def load_annotations_csv(filepath):
     """
@@ -48,77 +48,6 @@ def _iou(boxA, boxB):
     areaB = (boxB[2]-boxB[0])*(boxB[3]-boxB[1])
     union = areaA + areaB - inter
     return inter/union if union>0 else 0
-
-
-# def evaluate_detection_txt(icons_dir, test_path, anno_txt_path,
-#                            scales=[0.5,0.75,1.0,1.25,1.5],
-#                            ratio=0.75, reproj_thresh=5.0,
-#                            min_inliers=6, iou_thresh=0.3,
-#                            iou_eval_thresh=0.3):
-#     """
-#     Run detection and evaluate against .txt ground truth annotations.
-#     """
-#     import time
-#     start_time = time.time()
-#     img_orig = cv2.imread(test_path)
-#     kp2_full, desc2_full = extract_sift_features(img_orig)
-#     all_dets = []
-#     for scale in scales:
-#         img = cv2.resize(img_orig, None, fx=scale, fy=scale)
-#         kp2, desc2 = extract_sift_features(img)
-#         for icon_path in glob.glob(os.path.join(icons_dir, '*.png')):
-#             icon_label = os.path.splitext(os.path.basename(icon_path))[0]
-#             icon = cv2.imread(icon_path)
-#             kp1, desc1 = extract_sift_features(icon)
-#             icon_shape = icon.shape[:2]
-#             dets = detect_at_scale(icon_label, icon_shape,
-#                                    kp1, desc1, kp2, desc2,
-#                                    scale, reproj_thresh,
-#                                    min_inliers, ratio)
-#             all_dets.extend(dets)
-#     # NMS
-#     dets = sorted(all_dets, key=lambda d: d['score'], reverse=True)
-#     final = []
-#     while dets:
-#         curr = dets.pop(0)
-#         final.append(curr)
-#         dets = [d for d in dets if d['label'] != curr['label'] or _iou(curr['bbox'], d['bbox']) < iou_thresh]
-
-#     runtime = time.time() - start_time
-
-#     # Load GT
-#     gt = load_annotations_csv(anno_txt_path)
-#     TP, FP, FN = 0, 0, 0
-#     matched = set()
-
-#     for d in final:
-#         match_found = False
-#         for i, g in enumerate(gt):
-#             if normalize_label(g['label']) == normalize_label(d['label']):
-#                 iou = _iou(d['bbox'], g['bbox'])
-#                 if iou >= iou_eval_thresh and i not in matched:
-#                     TP += 1
-#                     matched.add(i)
-#                     match_found = True
-#                     break
-#         if not match_found:
-#             FP += 1
-
-#     FN = len(gt) - len(matched)
-
-#     acc = TP / (TP + FP + FN) if (TP + FP + FN) else 0
-#     tpr = TP / (TP + FN) if (TP + FN) else 0
-#     fpr = FP / (TP + FP) if (TP + FP) else 0
-
-#     print(f"\n=== Evaluation Results ===")
-#     print(f"TP: {TP}, FP: {FP}, FN: {FN}")
-#     print(f"Accuracy: {acc:.4f}")
-#     print(f"TPR: {tpr:.4f}")
-#     print(f"FPR: {fpr:.4f}")
-#     print(f"Avg Runtime: {runtime:.2f} seconds")
-
-#     return acc, tpr, fpr, runtime
-
 
 def match_features(desc1, desc2, ratio_thres=0.75):
     """
@@ -278,7 +207,7 @@ def extract_sift_features(image, grayscale=True):
     """Extract SIFT keypoints and descriptors."""
     if grayscale:
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    sift = cv2.SIFT_create()
+    sift = cv2.SIFT_create(contrastThreshold=0.02, edgeThreshold=10, nOctaveLayers=6)
     return sift.detectAndCompute(image, None)
 
 
@@ -328,7 +257,7 @@ def batch_multiscale_detect(icons_dir, test_path,
                             scales=[0.5,0.75,1.0,1.25,1.5],
                             ratio=0.75, reproj_thresh=5.0,
                             min_inliers=8, iou_thresh=0.3,
-                            visualize=True):
+                            visualize=False):
     """
     Run detection over multiple scales and apply class-aware NMS.
     Returns the final detection list (after NMS).
@@ -372,7 +301,6 @@ def batch_multiscale_detect(icons_dir, test_path,
         plt.show()
 
     return final
-
 
 def evaluate_predictions(detections, gt, iou_thresh=0.85):
     TP, FP, FN = 0, 0, 0
@@ -418,6 +346,8 @@ def batch_evaluate_all(icons_dir, images_dir, annos_dir,
     num_images = 0
 
     for img_name in image_files:
+        start_time = time.time()
+
         image_path = os.path.join(images_dir, img_name)
         base = os.path.splitext(img_name)[0]
         anno_path = os.path.join(annos_dir, base + anno_ext)
@@ -436,17 +366,19 @@ def batch_evaluate_all(icons_dir, images_dir, annos_dir,
         total_FP += FP
         total_FN += FN
         num_images += 1
+        total_runtime += time.time() - start_time
 
     if num_images == 0:
         print("No valid image-annotation pairs found.")
         return
 
-    total = total_TP + total_FP + total_FN
-    avg_acc = total_TP / total if total else 0
+    avg_acc = total_TP / (total_TP + total_FN) if total_TP + total_FN else 0
 
     avg_tpr = total_TP / (total_TP + total_FN) if total_TP + total_FN else 0
-    avg_fpr = total_FP / (total_TP + total_FP) if total_TP + total_FP else 0
+    avg_fpr = total_FP / (total_TP + total_FN) if total_TP + total_FN else 0
     avg_fnr = total_FN / (total_TP + total_FN) if total_TP + total_FN else 0
+
+    avg_runtime = total_runtime / num_images
 
     print(f"\nOverall Evaluation Across {num_images} Images")
     print(f"Total TP: {total_TP}, FP: {total_FP}, FN: {total_FN}")
@@ -454,6 +386,7 @@ def batch_evaluate_all(icons_dir, images_dir, annos_dir,
     print(f"Average TPR: {avg_tpr:.4f}")
     print(f"Average FPR: {avg_fpr:.4f}")
     print(f"Average FNR: {avg_fnr:.4f}")
+    print(f"Average Runtime:  {avg_runtime:.4f} seconds/image")
     
     return avg_acc, avg_tpr, avg_fpr, avg_fnr
 
