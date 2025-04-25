@@ -156,8 +156,8 @@ def testTask2(iconDir, testDir):
 
     # 1. Load and preprocess the templates.
     print("Loading and preprocessing templates...")
-    scales = []
-    templates_by_class = prepare_templates(template_dir, num_levels=3, preprocess=False, scales=scales, laplacian=True)
+    scales = [0.5, 0.375, 0.25, 0.125]
+    templates_by_class = prepare_templates(template_dir, num_levels=3, preprocess=False, scales=scales, laplacian=False)
 
     test_files = sorted([f for f in os.listdir(test_dir) if f.endswith(".png")])
     all_tp, all_fp, all_fn, all_ious = 0, 0, 0, []
@@ -218,7 +218,7 @@ def testTask2(iconDir, testDir):
         total_runtime += time.time() - start_time
         print(f"Runtime: {total_runtime}")
             
-        output_path = os.path.join(output_dir, f"laplacian_{filename}")
+        output_path = os.path.join(output_dir, f"{filename}")
         cv2.imwrite(output_path, original_image)
 
     print("\nMatching complete. Results saved in:", output_dir)
