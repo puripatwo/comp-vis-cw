@@ -16,7 +16,10 @@ def prepare_templates(template_dir, num_levels=4, preprocess=False, scales=[], l
     if laplacian:
         print("Using Laplacian Pyramid...")
     else:
-        print("Using Gaussian Pyramid...")
+        if len(scales) != 0:
+            print("Using Custom Gaussian Pyramid...")
+        else:
+            print("Using Gaussian Pyramid...")
 
     for filename in os.listdir(template_dir):
         if filename.endswith(".png"):
